@@ -1,6 +1,7 @@
-import json
 import os
-from flask import Flask, jsonify, request, render_template, after_this_request
+import psycopg2
+import psycopg2.extras
+from flask import Flask, jsonify, request, render_template
 
 app = Flask(__name__)
 
@@ -12,75 +13,124 @@ def add_cors(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     return response
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "data", "consultants.json")
+
+# ─── Database connection ────────────────────────────────────────────────────
+
+def get_db():
+    """Open a connection using the DATABASE_URL environment variable."""
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("DATABASE_URL environment variable is not set.")
+    # Render provides postgres:// but psycopg2 needs postgresql://
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    return psycopg2.connect(db_url, cursor_factory=psycopg2.extras.RealDictCursor)
+
+
+# ─── Schema + seed ──────────────────────────────────────────────────────────
 
 SEED_DATA = [
-    {"id": 1, "name": "Ahsan Rahman", "age": 42, "expertise": "Data Analytics", "yearsExp": 15, "location": "Dhaka", "hourlyRate": 65, "availability": "Available"},
-    {"id": 2, "name": "Farzana Kabir", "age": 37, "expertise": "Public Health", "yearsExp": 12, "location": "Chittagong", "hourlyRate": 60, "availability": "Available"},
-    {"id": 3, "name": "Mahmud Hasan", "age": 45, "expertise": "Supply Chain", "yearsExp": 18, "location": "Dhaka", "hourlyRate": 70, "availability": "Busy"},
-    {"id": 4, "name": "Nusrat Jahan", "age": 33, "expertise": "Gender Studies", "yearsExp": 9, "location": "Rajshahi", "hourlyRate": 55, "availability": "Available"},
-    {"id": 5, "name": "Tanvir Alam", "age": 39, "expertise": "IT Systems", "yearsExp": 14, "location": "Dhaka", "hourlyRate": 75, "availability": "Available"},
-    {"id": 6, "name": "Rezaul Karim", "age": 51, "expertise": "Agriculture Policy", "yearsExp": 25, "location": "Bogura", "hourlyRate": 68, "availability": "Busy"},
-    {"id": 7, "name": "Sadia Islam", "age": 34, "expertise": "Education Reform", "yearsExp": 10, "location": "Dhaka", "hourlyRate": 58, "availability": "Available"},
-    {"id": 8, "name": "Arif Chowdhury", "age": 48, "expertise": "Financial Consulting", "yearsExp": 20, "location": "Sylhet", "hourlyRate": 85, "availability": "Busy"},
-    {"id": 9, "name": "Tasnim Ahmed", "age": 31, "expertise": "UX Research", "yearsExp": 7, "location": "Dhaka", "hourlyRate": 50, "availability": "Available"},
-    {"id": 10, "name": "Kamrul Hasan", "age": 44, "expertise": "Infrastructure Planning", "yearsExp": 16, "location": "Khulna", "hourlyRate": 72, "availability": "Busy"},
-    {"id": 11, "name": "Rafiq Ahmed", "age": 52, "expertise": "Development Economics", "yearsExp": 24, "location": "Dhaka", "hourlyRate": 90, "availability": "Available"},
-    {"id": 12, "name": "Sharmin Akter", "age": 36, "expertise": "Nutrition Programs", "yearsExp": 11, "location": "Barisal", "hourlyRate": 57, "availability": "Available"},
-    {"id": 13, "name": "Imran Hossain", "age": 40, "expertise": "Market Research", "yearsExp": 14, "location": "Dhaka", "hourlyRate": 62, "availability": "Busy"},
-    {"id": 14, "name": "Shaila Noor", "age": 29, "expertise": "Social Research", "yearsExp": 6, "location": "Dhaka", "hourlyRate": 48, "availability": "Available"},
-    {"id": 15, "name": "Moinul Haque", "age": 47, "expertise": "Energy Policy", "yearsExp": 19, "location": "Dhaka", "hourlyRate": 82, "availability": "Busy"},
-    {"id": 16, "name": "Fahmida Sultana", "age": 35, "expertise": "Climate Adaptation", "yearsExp": 11, "location": "Khulna", "hourlyRate": 63, "availability": "Available"},
-    {"id": 17, "name": "Ziaur Rahman", "age": 50, "expertise": "Project Management", "yearsExp": 22, "location": "Dhaka", "hourlyRate": 88, "availability": "Busy"},
-    {"id": 18, "name": "Tamanna Rahman", "age": 32, "expertise": "Monitoring & Evaluation", "yearsExp": 8, "location": "Dhaka", "hourlyRate": 56, "availability": "Available"},
-    {"id": 19, "name": "Hasan Mahmud", "age": 43, "expertise": "Transport Planning", "yearsExp": 16, "location": "Chittagong", "hourlyRate": 74, "availability": "Busy"},
-    {"id": 20, "name": "Lamiya Haque", "age": 30, "expertise": "Policy Analysis", "yearsExp": 7, "location": "Dhaka", "hourlyRate": 52, "availability": "Available"},
-    {"id": 21, "name": "Shafayat Khan", "age": 46, "expertise": "Water Resources", "yearsExp": 18, "location": "Rajshahi", "hourlyRate": 77, "availability": "Busy"},
-    {"id": 22, "name": "Nafisa Karim", "age": 34, "expertise": "Behavioral Research", "yearsExp": 10, "location": "Dhaka", "hourlyRate": 59, "availability": "Available"},
-    {"id": 23, "name": "Badiul Alam", "age": 53, "expertise": "Governance Reform", "yearsExp": 25, "location": "Dhaka", "hourlyRate": 92, "availability": "Busy"},
-    {"id": 24, "name": "Rukhsana Begum", "age": 41, "expertise": "Rural Development", "yearsExp": 15, "location": "Rangpur", "hourlyRate": 61, "availability": "Available"},
-    {"id": 25, "name": "Farhan Siddique", "age": 38, "expertise": "Digital Transformation", "yearsExp": 13, "location": "Dhaka", "hourlyRate": 73, "availability": "Available"},
-    {"id": 26, "name": "Adnan Chowdhury", "age": 45, "expertise": "Logistics Strategy", "yearsExp": 17, "location": "Dhaka", "hourlyRate": 79, "availability": "Busy"},
-    {"id": 27, "name": "Tania Ahmed", "age": 33, "expertise": "Communications Strategy", "yearsExp": 9, "location": "Dhaka", "hourlyRate": 55, "availability": "Available"},
-    {"id": 28, "name": "Zarin Tasnim", "age": 28, "expertise": "Data Visualization", "yearsExp": 5, "location": "Dhaka", "hourlyRate": 46, "availability": "Available"},
-    {"id": 29, "name": "Omar Faruq", "age": 49, "expertise": "Industrial Policy", "yearsExp": 21, "location": "Chittagong", "hourlyRate": 86, "availability": "Busy"},
-    {"id": 30, "name": "Shakil Ahmed", "age": 37, "expertise": "Impact Evaluation", "yearsExp": 12, "location": "Dhaka", "hourlyRate": 64, "availability": "Available"},
-    {"id": 31, "name": "Nabila Sultana", "age": 35, "expertise": "Gender & Inclusion", "yearsExp": 10, "location": "Dhaka", "hourlyRate": 58, "availability": "Available"},
-    {"id": 32, "name": "Foysal Rahman", "age": 42, "expertise": "Business Strategy", "yearsExp": 15, "location": "Sylhet", "hourlyRate": 71, "availability": "Busy"},
-    {"id": 33, "name": "Lubna Karim", "age": 39, "expertise": "Education Technology", "yearsExp": 13, "location": "Dhaka", "hourlyRate": 67, "availability": "Available"},
-    {"id": 34, "name": "Ashiqur Rahman", "age": 44, "expertise": "Risk Management", "yearsExp": 16, "location": "Dhaka", "hourlyRate": 75, "availability": "Busy"},
-    {"id": 35, "name": "Saima Noor", "age": 31, "expertise": "Health Systems", "yearsExp": 8, "location": "Dhaka", "hourlyRate": 54, "availability": "Available"},
-    {"id": 36, "name": "Touhid Islam", "age": 47, "expertise": "Economic Policy", "yearsExp": 20, "location": "Dhaka", "hourlyRate": 83, "availability": "Busy"},
-    {"id": 37, "name": "Rashed Ahmed", "age": 36, "expertise": "Market Expansion", "yearsExp": 11, "location": "Chittagong", "hourlyRate": 62, "availability": "Available"},
-    {"id": 38, "name": "Fahad Karim", "age": 40, "expertise": "IT Security", "yearsExp": 14, "location": "Dhaka", "hourlyRate": 78, "availability": "Busy"},
-    {"id": 39, "name": "Meherun Nessa", "age": 34, "expertise": "NGO Management", "yearsExp": 9, "location": "Khulna", "hourlyRate": 56, "availability": "Available"},
-    {"id": 40, "name": "Parvez Alam", "age": 48, "expertise": "Infrastructure Finance", "yearsExp": 19, "location": "Dhaka", "hourlyRate": 87, "availability": "Busy"},
-    {"id": 41, "name": "Sabrina Islam", "age": 30, "expertise": "Youth Development", "yearsExp": 7, "location": "Dhaka", "hourlyRate": 49, "availability": "Available"},
-    {"id": 42, "name": "Javed Hasan", "age": 46, "expertise": "Trade Policy", "yearsExp": 18, "location": "Dhaka", "hourlyRate": 81, "availability": "Busy"},
-    {"id": 43, "name": "Samia Chowdhury", "age": 33, "expertise": "Environmental Policy", "yearsExp": 9, "location": "Dhaka", "hourlyRate": 57, "availability": "Available"},
-    {"id": 44, "name": "Muntasir Rahman", "age": 41, "expertise": "Data Engineering", "yearsExp": 15, "location": "Dhaka", "hourlyRate": 76, "availability": "Busy"},
-    {"id": 45, "name": "Sharmeen Akter", "age": 35, "expertise": "Community Engagement", "yearsExp": 11, "location": "Barisal", "hourlyRate": 58, "availability": "Available"},
-    {"id": 46, "name": "Rakib Hasan", "age": 38, "expertise": "Urban Planning", "yearsExp": 13, "location": "Dhaka", "hourlyRate": 69, "availability": "Busy"},
-    {"id": 47, "name": "Dilruba Sultana", "age": 43, "expertise": "Social Protection", "yearsExp": 16, "location": "Rangpur", "hourlyRate": 65, "availability": "Available"},
-    {"id": 48, "name": "Tanmoy Das", "age": 29, "expertise": "Digital Marketing", "yearsExp": 6, "location": "Dhaka", "hourlyRate": 47, "availability": "Available"},
-    {"id": 49, "name": "Jannatul Ferdous", "age": 32, "expertise": "Monitoring Systems", "yearsExp": 8, "location": "Dhaka", "hourlyRate": 53, "availability": "Available"},
-    {"id": 50, "name": "Mahfuz Rahman", "age": 45, "expertise": "Financial Modeling", "yearsExp": 17, "location": "Dhaka", "hourlyRate": 84, "availability": "Busy"},
+    ("Ahsan Rahman", 42, "Data Analytics", 15, "Dhaka", 65, "Available"),
+    ("Farzana Kabir", 37, "Public Health", 12, "Chittagong", 60, "Available"),
+    ("Mahmud Hasan", 45, "Supply Chain", 18, "Dhaka", 70, "Busy"),
+    ("Nusrat Jahan", 33, "Gender Studies", 9, "Rajshahi", 55, "Available"),
+    ("Tanvir Alam", 39, "IT Systems", 14, "Dhaka", 75, "Available"),
+    ("Rezaul Karim", 51, "Agriculture Policy", 25, "Bogura", 68, "Busy"),
+    ("Sadia Islam", 34, "Education Reform", 10, "Dhaka", 58, "Available"),
+    ("Arif Chowdhury", 48, "Financial Consulting", 20, "Sylhet", 85, "Busy"),
+    ("Tasnim Ahmed", 31, "UX Research", 7, "Dhaka", 50, "Available"),
+    ("Kamrul Hasan", 44, "Infrastructure Planning", 16, "Khulna", 72, "Busy"),
+    ("Rafiq Ahmed", 52, "Development Economics", 24, "Dhaka", 90, "Available"),
+    ("Sharmin Akter", 36, "Nutrition Programs", 11, "Barisal", 57, "Available"),
+    ("Imran Hossain", 40, "Market Research", 14, "Dhaka", 62, "Busy"),
+    ("Shaila Noor", 29, "Social Research", 6, "Dhaka", 48, "Available"),
+    ("Moinul Haque", 47, "Energy Policy", 19, "Dhaka", 82, "Busy"),
+    ("Fahmida Sultana", 35, "Climate Adaptation", 11, "Khulna", 63, "Available"),
+    ("Ziaur Rahman", 50, "Project Management", 22, "Dhaka", 88, "Busy"),
+    ("Tamanna Rahman", 32, "Monitoring & Evaluation", 8, "Dhaka", 56, "Available"),
+    ("Hasan Mahmud", 43, "Transport Planning", 16, "Chittagong", 74, "Busy"),
+    ("Lamiya Haque", 30, "Policy Analysis", 7, "Dhaka", 52, "Available"),
+    ("Shafayat Khan", 46, "Water Resources", 18, "Rajshahi", 77, "Busy"),
+    ("Nafisa Karim", 34, "Behavioral Research", 10, "Dhaka", 59, "Available"),
+    ("Badiul Alam", 53, "Governance Reform", 25, "Dhaka", 92, "Busy"),
+    ("Rukhsana Begum", 41, "Rural Development", 15, "Rangpur", 61, "Available"),
+    ("Farhan Siddique", 38, "Digital Transformation", 13, "Dhaka", 73, "Available"),
+    ("Adnan Chowdhury", 45, "Logistics Strategy", 17, "Dhaka", 79, "Busy"),
+    ("Tania Ahmed", 33, "Communications Strategy", 9, "Dhaka", 55, "Available"),
+    ("Zarin Tasnim", 28, "Data Visualization", 5, "Dhaka", 46, "Available"),
+    ("Omar Faruq", 49, "Industrial Policy", 21, "Chittagong", 86, "Busy"),
+    ("Shakil Ahmed", 37, "Impact Evaluation", 12, "Dhaka", 64, "Available"),
+    ("Nabila Sultana", 35, "Gender & Inclusion", 10, "Dhaka", 58, "Available"),
+    ("Foysal Rahman", 42, "Business Strategy", 15, "Sylhet", 71, "Busy"),
+    ("Lubna Karim", 39, "Education Technology", 13, "Dhaka", 67, "Available"),
+    ("Ashiqur Rahman", 44, "Risk Management", 16, "Dhaka", 75, "Busy"),
+    ("Saima Noor", 31, "Health Systems", 8, "Dhaka", 54, "Available"),
+    ("Touhid Islam", 47, "Economic Policy", 20, "Dhaka", 83, "Busy"),
+    ("Rashed Ahmed", 36, "Market Expansion", 11, "Chittagong", 62, "Available"),
+    ("Fahad Karim", 40, "IT Security", 14, "Dhaka", 78, "Busy"),
+    ("Meherun Nessa", 34, "NGO Management", 9, "Khulna", 56, "Available"),
+    ("Parvez Alam", 48, "Infrastructure Finance", 19, "Dhaka", 87, "Busy"),
+    ("Sabrina Islam", 30, "Youth Development", 7, "Dhaka", 49, "Available"),
+    ("Javed Hasan", 46, "Trade Policy", 18, "Dhaka", 81, "Busy"),
+    ("Samia Chowdhury", 33, "Environmental Policy", 9, "Dhaka", 57, "Available"),
+    ("Muntasir Rahman", 41, "Data Engineering", 15, "Dhaka", 76, "Busy"),
+    ("Sharmeen Akter", 35, "Community Engagement", 11, "Barisal", 58, "Available"),
+    ("Rakib Hasan", 38, "Urban Planning", 13, "Dhaka", 69, "Busy"),
+    ("Dilruba Sultana", 43, "Social Protection", 16, "Rangpur", 65, "Available"),
+    ("Tanmoy Das", 29, "Digital Marketing", 6, "Dhaka", 47, "Available"),
+    ("Jannatul Ferdous", 32, "Monitoring Systems", 8, "Dhaka", 53, "Available"),
+    ("Mahfuz Rahman", 45, "Financial Modeling", 17, "Dhaka", 84, "Busy"),
 ]
 
 
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        save_data(SEED_DATA)
-        return SEED_DATA
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+def init_db():
+    """Create the table if it doesn't exist, then seed it if empty."""
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS consultants (
+            id           SERIAL PRIMARY KEY,
+            name         TEXT         NOT NULL,
+            age          INTEGER      NOT NULL,
+            expertise    TEXT         NOT NULL,
+            years_exp    INTEGER      NOT NULL,
+            location     TEXT         NOT NULL,
+            hourly_rate  NUMERIC(8,2) NOT NULL,
+            availability TEXT         NOT NULL DEFAULT 'Available'
+        );
+    """)
+
+    cur.execute("SELECT COUNT(*) FROM consultants;")
+    count = cur.fetchone()["count"]
+
+    if count == 0:
+        cur.executemany("""
+            INSERT INTO consultants
+                (name, age, expertise, years_exp, location, hourly_rate, availability)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, SEED_DATA)
+
+    conn.commit()
+    cur.close()
+    conn.close()
 
 
-def save_data(data):
-    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+def row_to_dict(row):
+    """Convert a DB row to the JSON shape the frontend expects."""
+    return {
+        "id":           row["id"],
+        "name":         row["name"],
+        "age":          row["age"],
+        "expertise":    row["expertise"],
+        "yearsExp":     row["years_exp"],
+        "location":     row["location"],
+        "hourlyRate":   float(row["hourly_rate"]),
+        "availability": row["availability"],
+    }
 
+
+# ─── Routes ─────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
@@ -89,8 +139,13 @@ def index():
 
 @app.route("/api/consultants", methods=["GET"])
 def get_consultants():
-    data = load_data()
-    return jsonify(data)
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM consultants ORDER BY id;")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify([row_to_dict(r) for r in rows])
 
 
 @app.route("/api/consultants", methods=["POST"])
@@ -104,46 +159,82 @@ def add_consultant():
         if field not in body or body[field] == "" or body[field] is None:
             return jsonify({"error": f"Missing required field: {field}"}), 400
 
-    data = load_data()
-    next_id = max((c["id"] for c in data), default=0) + 1
-
-    new_consultant = {
-        "id": next_id,
-        "name": str(body["name"]).strip(),
-        "age": int(body["age"]),
-        "expertise": str(body["expertise"]).strip(),
-        "yearsExp": int(body["yearsExp"]),
-        "location": str(body["location"]).strip(),
-        "hourlyRate": float(body["hourlyRate"]),
-        "availability": str(body["availability"]),
-    }
-
-    data.append(new_consultant)
-    save_data(data)
-    return jsonify(new_consultant), 201
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO consultants
+            (name, age, expertise, years_exp, location, hourly_rate, availability)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING *;
+    """, (
+        str(body["name"]).strip(),
+        int(body["age"]),
+        str(body["expertise"]).strip(),
+        int(body["yearsExp"]),
+        str(body["location"]).strip(),
+        float(body["hourlyRate"]),
+        str(body["availability"]),
+    ))
+    new_row = cur.fetchone()
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify(row_to_dict(new_row)), 201
 
 
 @app.route("/api/consultants/<int:consultant_id>", methods=["PUT"])
 def update_consultant(consultant_id):
     body = request.get_json()
-    data = load_data()
-    for i, c in enumerate(data):
-        if c["id"] == consultant_id:
-            data[i].update({k: v for k, v in body.items() if k != "id"})
-            save_data(data)
-            return jsonify(data[i])
-    return jsonify({"error": "Consultant not found"}), 404
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE consultants SET
+            name         = COALESCE(%s, name),
+            age          = COALESCE(%s, age),
+            expertise    = COALESCE(%s, expertise),
+            years_exp    = COALESCE(%s, years_exp),
+            location     = COALESCE(%s, location),
+            hourly_rate  = COALESCE(%s, hourly_rate),
+            availability = COALESCE(%s, availability)
+        WHERE id = %s
+        RETURNING *;
+    """, (
+        body.get("name"),
+        body.get("age"),
+        body.get("expertise"),
+        body.get("yearsExp"),
+        body.get("location"),
+        body.get("hourlyRate"),
+        body.get("availability"),
+        consultant_id,
+    ))
+    updated = cur.fetchone()
+    conn.commit()
+    cur.close()
+    conn.close()
+    if not updated:
+        return jsonify({"error": "Consultant not found"}), 404
+    return jsonify(row_to_dict(updated))
 
 
 @app.route("/api/consultants/<int:consultant_id>", methods=["DELETE"])
 def delete_consultant(consultant_id):
-    data = load_data()
-    new_data = [c for c in data if c["id"] != consultant_id]
-    if len(new_data) == len(data):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM consultants WHERE id = %s RETURNING id;", (consultant_id,))
+    deleted = cur.fetchone()
+    conn.commit()
+    cur.close()
+    conn.close()
+    if not deleted:
         return jsonify({"error": "Consultant not found"}), 404
-    save_data(new_data)
     return jsonify({"deleted": consultant_id})
 
+
+# ─── Startup ─────────────────────────────────────────────────────────────────
+# init_db() runs both when started directly and when gunicorn imports the module
+
+init_db()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
