@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Consultant Pool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0f0e; --surface: #161918; --surface2: #1f2220;
+      --border: #2a2e2c; --border2: #353b38;
+      --text: #e8ece9; --text2: #8a9490; --text3: #5a6360;
+      --accent: #3ddc84; --accent-dim: rgba(61,220,132,0.12); --accent-dim2: rgba(61,220,132,0.06);
+      --busy: #ff6b6b; --busy-dim: rgba(255,107,107,0.12);
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .app { min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* HEADER */
+    .header {
+      border-bottom: 1px solid var(--border); padding: 0 32px;
+      display: flex; align-items: center; justify-content: space-between; height: 64px;
+      position: sticky; top: 0; background: rgba(13,15,14,0.95);
+      backdrop-filter: blur(12px); z-index: 100;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-mark {
+      width: 32px; height: 32px; background: var(--accent); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'DM Mono', monospace; font-size: 14px; color: #0d0f0e; font-weight: 500;
+    }
+    .logo-text { font-family: 'DM Serif Display', serif; font-size: 18px; letter-spacing: -0.3px; }
+    .logo-text span { color: var(--text2); font-style: italic; }
+    .header-stats { display: flex; gap: 24px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text3); }
+    .stat-item { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+    .stat-num { color: var(--text); font-size: 15px; }
+    .stat-num.green { color: var(--accent); }
+
+    /* MAIN */
+    .main { flex: 1; display: flex; }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 268px; flex-shrink: 0; border-right: 1px solid var(--border);
+      padding: 24px 18px; display: flex; flex-direction: column; gap: 20px;
+      position: sticky; top: 64px; height: calc(100vh - 64px); overflow-y: auto;
+    }
+    .sidebar-title {
+      font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 1.5px; color: var(--text3); margin-bottom: 6px;
+    }
+    .search-box, .filter-select, .rate-input, .form-input, .form-select {
+      width: 100%; padding: 10px 12px; background: var(--surface);
+      border: 1px solid var(--border2); border-radius: 8px; color: var(--text);
+      font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color 0.2s;
+    }
+    .search-box::placeholder, .form-input::placeholder { color: var(--text3); }
+    .search-box:focus, .filter-select:focus, .rate-input:focus, .form-input:focus, .form-select:focus { border-color: var(--accent); }
+    .filter-select option, .form-select option { background: var(--surface2); }
+    .filter-label { font-size: 12px; color: var(--text2); margin-bottom: 4px; margin-top: 2px; }
+    .rate-inputs { display: flex; align-items: center; gap: 8px; }
+    .rate-input { text-align: center; font-family: 'DM Mono', monospace; font-size: 12px; }
+    .rate-sep { color: var(--text3); font-size: 12px; flex-shrink: 0; }
+    .avail-btns { display: flex; gap: 6px; }
+    .avail-btn {
+      flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border2);
+      background: var(--surface); color: var(--text2); font-size: 12px;
+      font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.15s; text-align: center;
+    }
+    .avail-btn:hover { background: var(--surface2); }
+    .avail-btn.active-all, .avail-btn.active-avail { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+    .avail-btn.active-busy { border-color: var(--busy); background: var(--busy-dim); color: var(--busy); }
+    .clear-btn {
+      width: 100%; padding: 9px; background: transparent; border: 1px solid var(--border2);
+      border-radius: 8px; color: var(--text3); font-size: 12px; font-family: 'DM Sans', sans-serif;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .clear-btn:hover { color: var(--text2); background: var(--surface); }
+
+    /* CONTENT */
+    .content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .toolbar {
+      padding: 14px 24px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; background: var(--surface); gap: 12px; flex-wrap: wrap;
+    }
+    .result-count { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text2); white-space: nowrap; }
+    .result-count span { color: var(--text); font-weight: 500; }
+    .toolbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .sort-controls { display: flex; align-items: center; gap: 6px; }
+    .sort-label { font-size: 12px; color: var(--text3); }
+    .sort-btn {
+      padding: 6px 12px; background: transparent; border: 1px solid var(--border2);
+      border-radius: 6px; color: var(--text2); font-size: 12px; font-family: 'DM Sans', sans-serif;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .sort-btn.active { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+    .sort-btn:hover:not(.active) { background: var(--surface2); }
+    .add-btn {
+      padding: 8px 16px; background: var(--accent); border: none; border-radius: 8px;
+      color: #0d0f0e; font-size: 13px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+      cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; white-space: nowrap;
+    }
+    .add-btn:hover { background: #4de896; transform: translateY(-1px); }
+
+    /* TABLE */
+    .table-wrap { flex: 1; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead { position: sticky; top: 0; z-index: 10; }
+    th {
+      background: var(--surface2); padding: 12px 16px; text-align: left;
+      font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 1px; color: var(--text3);
+      border-bottom: 1px solid var(--border); white-space: nowrap; user-select: none; cursor: pointer;
+    }
+    th:hover { color: var(--text2); }
+    th.asc::after { content: ' ↑'; color: var(--accent); }
+    th.desc::after { content: ' ↓'; color: var(--accent); }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.12s; }
+    tbody tr:hover { background: var(--surface); }
+    td { padding: 13px 16px; font-size: 14px; vertical-align: middle; }
+    .td-id { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
+    .name-cell { display: flex; align-items: center; gap: 10px; }
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%; background: var(--accent-dim);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      font-family: 'DM Mono', monospace; font-size: 11px; color: var(--accent);
+      border: 1px solid rgba(61,220,132,0.2);
+    }
+    .td-name { font-weight: 500; }
+    .expertise-tag {
+      display: inline-block; padding: 3px 8px; background: var(--surface2);
+      border: 1px solid var(--border2); border-radius: 4px; font-size: 12px; color: var(--text2);
+    }
+    .td-rate { font-family: 'DM Mono', monospace; font-size: 13px; }
+    .currency { color: var(--text3); font-size: 11px; }
+    .td-muted { color: var(--text2); font-size: 13px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px;
+      border-radius: 20px; font-size: 11px; font-weight: 500; letter-spacing: 0.3px;
+    }
+    .badge-available { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(61,220,132,0.2); }
+    .badge-busy { background: var(--busy-dim); color: var(--busy); border: 1px solid rgba(255,107,107,0.2); }
+    .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+    /* EMPTY / LOADING */
+    .state-center {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 12px; padding: 80px; color: var(--text3);
+    }
+    .state-icon { font-size: 40px; opacity: 0.4; }
+    .state-title { font-size: 16px; color: var(--text2); }
+    .state-sub { font-size: 13px; }
+    .spinner {
+      width: 24px; height: 24px; border: 2px solid var(--border2);
+      border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* MODAL */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      z-index: 1000; display: flex; align-items: center; justify-content: center;
+    }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border2); border-radius: 16px;
+      padding: 32px; width: 480px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 4px 40px rgba(0,0,0,0.5); animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp { from { opacity:0; transform: translateY(20px) scale(0.97); } to { opacity:1; transform: none; } }
+    .modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28px; }
+    .modal-title { font-family: 'DM Serif Display', serif; font-size: 22px; }
+    .modal-sub { color: var(--text3); font-size: 13px; margin-top: 4px; }
+    .modal-close {
+      background: var(--surface2); border: 1px solid var(--border2); color: var(--text2);
+      width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s;
+    }
+    .modal-close:hover { background: var(--border); color: var(--text); }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-field { display: flex; flex-direction: column; gap: 6px; }
+    .form-field.full { grid-column: 1 / -1; }
+    .form-field label { font-size: 12px; color: var(--text2); font-weight: 500; }
+    .form-input.err, .form-select.err { border-color: var(--busy); }
+    .form-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+    .btn-cancel {
+      padding: 10px 20px; background: transparent; border: 1px solid var(--border2);
+      border-radius: 8px; color: var(--text2); font-family: 'DM Sans', sans-serif;
+      font-size: 14px; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-cancel:hover { background: var(--surface2); }
+    .btn-submit {
+      padding: 10px 24px; background: var(--accent); border: none; border-radius: 8px;
+      color: #0d0f0e; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .btn-submit:hover { background: #4de896; }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; background: var(--surface2);
+      border: 1px solid var(--accent); border-radius: 10px; padding: 12px 18px;
+      color: var(--accent); font-size: 14px; display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4); z-index: 2000; animation: toastIn 0.3s ease;
+    }
+    @keyframes toastIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: none; } }
+    .hidden { display: none !important; }
+
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .header { padding: 0 16px; }
+      .toolbar { padding: 12px 16px; }
+      td, th { padding: 10px 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- HEADER -->
+  <header class="header">
+    <div class="logo">
+      <div class="logo-mark">CP</div>
+      <div class="logo-text">Consultant <span>Pool</span></div>
+    </div>
+    <div class="header-stats">
+      <div class="stat-item"><span class="stat-num" id="stat-total">—</span><span>Total</span></div>
+      <div class="stat-item"><span class="stat-num green" id="stat-avail">—</span><span>Available</span></div>
+      <div class="stat-item"><span class="stat-num" id="stat-busy">—</span><span>Busy</span></div>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div>
+        <div class="sidebar-title">Search</div>
+        <input class="search-box" id="search" placeholder="Name, expertise, location…" />
+      </div>
+      <div>
+        <div class="sidebar-title">Filters</div>
+        <div class="filter-label">Expertise</div>
+        <select class="filter-select" id="filter-expertise"><option value="">All Expertise</option></select>
+        <div class="filter-label" style="margin-top:10px">Location</div>
+        <select class="filter-select" id="filter-location"><option value="">All Locations</option></select>
+      </div>
+      <div>
+        <div class="sidebar-title">Hourly Rate (USD)</div>
+        <div class="rate-inputs">
+          <input class="rate-input" id="rate-min" placeholder="Min" type="number" />
+          <span class="rate-sep">—</span>
+          <input class="rate-input" id="rate-max" placeholder="Max" type="number" />
+        </div>
+      </div>
+      <div>
+        <div class="sidebar-title">Availability</div>
+        <div class="avail-btns">
+          <button class="avail-btn active-all" data-avail="all">All</button>
+          <button class="avail-btn" data-avail="available">Free</button>
+          <button class="avail-btn" data-avail="busy">Busy</button>
+        </div>
+      </div>
+      <button class="clear-btn" id="clear-btn">Clear all filters</button>
+    </aside>
+
+    <!-- CONTENT -->
+    <div class="content">
+      <div class="toolbar">
+        <div class="result-count">Showing <span id="count-shown">—</span> of <span id="count-total">—</span> consultants</div>
+        <div class="toolbar-right">
+          <div class="sort-controls">
+            <span class="sort-label">Sort:</span>
+            <button class="sort-btn" data-sort="hourlyRate">Rate</button>
+            <button class="sort-btn" data-sort="yearsExp">Exp</button>
+            <button class="sort-btn" data-sort="name">Name</button>
+          </div>
+          <button class="add-btn" id="add-btn">＋ Add Consultant</button>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div class="state-center" id="loading-state">
+        <div class="spinner"></div>
+        <span>Loading consultants…</span>
+      </div>
+
+      <!-- Empty -->
+      <div class="state-center hidden" id="empty-state">
+        <div class="state-icon">🔍</div>
+        <div class="state-title">No consultants found</div>
+        <div class="state-sub">Try adjusting your filters</div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-wrap hidden" id="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-col="id">#</th>
+              <th data-col="name">Name</th>
+              <th data-col="expertise">Expertise</th>
+              <th data-col="location">Location</th>
+              <th data-col="hourlyRate">Rate/hr</th>
+              <th data-col="yearsExp">Exp.</th>
+              <th data-col="availability">Status</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="overlay hidden" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Add New Consultant</div>
+        <div class="modal-sub">Fill in the details to add to the pool</div>
+      </div>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-field full">
+        <label>Full Name *</label>
+        <input class="form-input" id="f-name" placeholder="e.g. Ahmed Rahman" />
+      </div>
+      <div class="form-field">
+        <label>Age *</label>
+        <input class="form-input" id="f-age" type="number" placeholder="e.g. 35" />
+      </div>
+      <div class="form-field">
+        <label>Years of Experience *</label>
+        <input class="form-input" id="f-exp" type="number" placeholder="e.g. 10" />
+      </div>
+      <div class="form-field full">
+        <label>Expertise *</label>
+        <input class="form-input" id="f-expertise" placeholder="e.g. Data Analytics" list="expertise-dl" />
+        <datalist id="expertise-dl"></datalist>
+      </div>
+      <div class="form-field full">
+        <label>Location *</label>
+        <input class="form-input" id="f-location" placeholder="e.g. Dhaka" list="location-dl" />
+        <datalist id="location-dl"></datalist>
+      </div>
+      <div class="form-field">
+        <label>Hourly Rate (USD) *</label>
+        <input class="form-input" id="f-rate" type="number" placeholder="e.g. 65" />
+      </div>
+      <div class="form-field">
+        <label>Availability</label>
+        <select class="form-select" id="f-avail">
+          <option value="Available">Available</option>
+          <option value="Busy">Busy</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="modal-cancel">Cancel</button>
+      <button class="btn-submit" id="modal-submit">Add Consultant</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast hidden" id="toast"></div>
+
+<script>
+  let consultants = [];
+  let sortCol = 'id';
+  let sortDir = 'asc';
+  let filterAvail = 'all';
+  let toastTimer = null;
+
+  const $ = id => document.getElementById(id);
+
+  // --- API ---
+  async function fetchConsultants() {
+    const res = await fetch('/api/consultants');
+    return res.json();
+  }
+
+  async function postConsultant(data) {
+    const res = await fetch('/api/consultants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
+
+  // --- INIT ---
+  async function init() {
+    consultants = await fetchConsultants();
+    populateFilters();
+    render();
+  }
+
+  function populateFilters() {
+    const expertises = [...new Set(consultants.map(c => c.expertise))].sort();
+    const locations = [...new Set(consultants.map(c => c.location))].sort();
+
+    const eSelect = $('filter-expertise');
+    eSelect.innerHTML = '<option value="">All Expertise</option>' +
+      expertises.map(e => `<option value="${e}">${e}</option>`).join('');
+
+    const lSelect = $('filter-location');
+    lSelect.innerHTML = '<option value="">All Locations</option>' +
+      locations.map(l => `<option value="${l}">${l}</option>`).join('');
+
+    $('expertise-dl').innerHTML = expertises.map(e => `<option value="${e}"></option>`).join('');
+    $('location-dl').innerHTML = locations.map(l => `<option value="${l}"></option>`).join('');
+  }
+
+  // --- RENDER ---
+  function getFiltered() {
+    const q = $('search').value.toLowerCase();
+    const expertise = $('filter-expertise').value;
+    const location = $('filter-location').value;
+    const rMin = parseFloat($('rate-min').value) || 0;
+    const rMax = parseFloat($('rate-max').value) || Infinity;
+
+    return consultants
+      .filter(c => {
+        if (q && !c.name.toLowerCase().includes(q) && !c.expertise.toLowerCase().includes(q) && !c.location.toLowerCase().includes(q)) return false;
+        if (expertise && c.expertise !== expertise) return false;
+        if (location && c.location !== location) return false;
+        if (filterAvail === 'available' && c.availability !== 'Available') return false;
+        if (filterAvail === 'busy' && c.availability !== 'Busy') return false;
+        if (c.hourlyRate < rMin || c.hourlyRate > rMax) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        let av = a[sortCol], bv = b[sortCol];
+        if (typeof av === 'string') { av = av.toLowerCase(); bv = bv.toLowerCase(); }
+        return sortDir === 'asc' ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+      });
+  }
+
+  function initials(name) {
+    return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+  }
+
+  function render() {
+    const filtered = getFiltered();
+    const avail = consultants.filter(c => c.availability === 'Available').length;
+
+    $('stat-total').textContent = consultants.length;
+    $('stat-avail').textContent = avail;
+    $('stat-busy').textContent = consultants.length - avail;
+    $('count-shown').textContent = filtered.length;
+    $('count-total').textContent = consultants.length;
+
+    $('loading-state').classList.add('hidden');
+
+    if (filtered.length === 0) {
+      $('empty-state').classList.remove('hidden');
+      $('table-wrap').classList.add('hidden');
+    } else {
+      $('empty-state').classList.add('hidden');
+      $('table-wrap').classList.remove('hidden');
+    }
+
+    $('tbody').innerHTML = filtered.map(c => `
+      <tr>
+        <td><span class="td-id">${String(c.id).padStart(2,'0')}</span></td>
+        <td>
+          <div class="name-cell">
+            <div class="avatar">${initials(c.name)}</div>
+            <span class="td-name">${c.name}</span>
+          </div>
+        </td>
+        <td><span class="expertise-tag">${c.expertise}</span></td>
+        <td><span class="td-muted">${c.location}</span></td>
+        <td><span class="td-rate"><span class="currency">$</span>${c.hourlyRate}<span class="currency">/hr</span></span></td>
+        <td><span class="td-muted">${c.yearsExp}y</span></td>
+        <td><span class="badge ${c.availability === 'Available' ? 'badge-available' : 'badge-busy'}"><span class="badge-dot"></span>${c.availability}</span></td>
+      </tr>
+    `).join('');
+
+    // Update sort headers
+    document.querySelectorAll('th[data-col]').forEach(th => {
+      th.classList.remove('asc','desc');
+      if (th.dataset.col === sortCol) th.classList.add(sortDir);
+    });
+  }
+
+  // --- EVENTS ---
+  ['search','filter-expertise','filter-location','rate-min','rate-max'].forEach(id => {
+    $(id).addEventListener('input', render);
+  });
+
+  document.querySelectorAll('.avail-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterAvail = btn.dataset.avail;
+      document.querySelectorAll('.avail-btn').forEach(b => b.className = 'avail-btn');
+      btn.classList.add('active-' + filterAvail);
+      render();
+    });
+  });
+
+  document.querySelectorAll('th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortCol = col; sortDir = 'asc'; }
+      render();
+    });
+  });
+
+  document.querySelectorAll('.sort-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const col = btn.dataset.sort;
+      if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortCol = col; sortDir = 'asc'; }
+      document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      render();
+    });
+  });
+
+  $('clear-btn').addEventListener('click', () => {
+    $('search').value = '';
+    $('filter-expertise').value = '';
+    $('filter-location').value = '';
+    $('rate-min').value = '';
+    $('rate-max').value = '';
+    filterAvail = 'all';
+    document.querySelectorAll('.avail-btn').forEach(b => b.className = 'avail-btn');
+    document.querySelector('[data-avail="all"]').classList.add('active-all');
+    render();
+  });
+
+  // Modal
+  $('add-btn').addEventListener('click', () => $('modal').classList.remove('hidden'));
+  $('modal-close').addEventListener('click', closeModal);
+  $('modal-cancel').addEventListener('click', closeModal);
+  $('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
+
+  function closeModal() {
+    $('modal').classList.add('hidden');
+    ['f-name','f-age','f-exp','f-expertise','f-location','f-rate'].forEach(id => {
+      $(id).value = '';
+      $(id).classList.remove('err');
+    });
+    $('f-avail').value = 'Available';
+  }
+
+  $('modal-submit').addEventListener('click', async () => {
+    const fields = {
+      name: $('f-name').value.trim(),
+      age: $('f-age').value,
+      yearsExp: $('f-exp').value,
+      expertise: $('f-expertise').value.trim(),
+      location: $('f-location').value.trim(),
+      hourlyRate: $('f-rate').value,
+      availability: $('f-avail').value,
+    };
+
+    let valid = true;
+    [['f-name', fields.name], ['f-age', fields.age], ['f-exp', fields.yearsExp],
+     ['f-expertise', fields.expertise], ['f-location', fields.location], ['f-rate', fields.hourlyRate]
+    ].forEach(([id, val]) => {
+      const el = $(id);
+      if (!val || (typeof val === 'string' && val === '')) { el.classList.add('err'); valid = false; }
+      else el.classList.remove('err');
+    });
+
+    if (!valid) return;
+
+    const btn = $('modal-submit');
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+
+    try {
+      const added = await postConsultant({
+        ...fields,
+        age: parseInt(fields.age),
+        yearsExp: parseInt(fields.yearsExp),
+        hourlyRate: parseFloat(fields.hourlyRate),
+      });
+      consultants.push(added);
+      populateFilters();
+      render();
+      closeModal();
+      showToast(`${added.name} added successfully`);
+    } catch(e) {
+      showToast('Error adding consultant. Please try again.');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Add Consultant';
+  });
+
+  function showToast(msg) {
+    const t = $('toast');
+    t.textContent = '✓ ' + msg;
+    t.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.add('hidden'), 2800);
+  }
+
+  init();
+</script>
+</body>
+</html>
